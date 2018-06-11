@@ -4,9 +4,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DAM_FW.Attribute
+namespace DAM_FW
 {
-    class DataType
+    public enum DataType
     {
+        INT,
+        FLOAT,
+        CHAR,
+        NCHAR,
+        VARCHAR,
+        NVARCHAR,
+        BOOL
     }
 }
