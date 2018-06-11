@@ -1,8 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Reflection;
 
 namespace DAM_FW.Mapping
 {
@@ -10,12 +9,155 @@ namespace DAM_FW.Mapping
     {
         protected override void MapOneToMany<T>(SqlServer.MyConnection cnn, System.Data.DataRow dr, T obj)
         {
-            throw new NotImplementedException();
+            var properties = typeof(T).GetProperties();
+
+            foreach (var property in properties)
+            {
+                var attributes = property.GetCustomAttributes(false);
+
+                var oneToManyAttributes = GetAll(attributes, typeof(OneToManyAttribute));
+                if (oneToManyAttributes != null && oneToManyAttributes.Length != 0)
+                {
+                    foreach (OneToManyAttribute oneToManyAttribute in oneToManyAttributes)
+                    {
+                        Type type = property.PropertyType;
+                        if (type.IsGenericType)
+                        {
+                            Type itemType = type.GetGenericArguments()[0];
+                            MySqlServerMapper mapper = new MySqlServerMapper();
+
+                            MethodInfo getTableNameMethod = mapper.GetType().GetMethod("GetTableName")
+                               .MakeGenericMethod(new Type[] { itemType });
+                            string tableName = getTableNameMethod.Invoke(mapper, null) as string;
+
+                            MethodInfo getForeignKeyAttributeMethod = mapper.GetType().GetMethod("GetForeignKeys")
+                                .MakeGenericMethod(new Type[] { itemType });
+                            List<ForeignKeyAttribute> foreignKeyAttributes = getForeignKeyAttributeMethod.Invoke(mapper, new object[] { oneToManyAttribute.RelationshipID }) as List<ForeignKeyAttribute>;
+
+                            MethodInfo getColumnAttributeMethod = mapper.GetType().GetMethod("GetColumns")
+                                .MakeGenericMethod(typeof(T));
+                            List<ColumnAttribute> columnAttributes = getColumnAttributeMethod.Invoke(mapper, null) as List<ColumnAttribute>;
+
+                            string whereStr = string.Empty;
+                            if (foreignKeyAttributes != null)
+                            {
+                                foreach (ForeignKeyAttribute foreignKeyAttribute in foreignKeyAttributes)
+                                {
+                                    ColumnAttribute column = FindColumn(foreignKeyAttribute.References, columnAttributes);
+                                    if (column != null)
+                                    {
+                                        string format = "{0} = {1}, ";
+                                        if (column.Type == DataType.NCHAR || column.Type == DataType.NVARCHAR)
+                                            format = "{0} = N'{1}', ";
+                                        else if (column.Type == DataType.CHAR || column.Type == DataType.VARCHAR)
+                                            format = "{0} = '{1}', ";
+
+                                        whereStr += string.Format(format, foreignKeyAttribute.Name, dr[foreignKeyAttribute.References]);
+                                    }
+                                }
+                            }
+                            if (!string.IsNullOrEmpty(whereStr))
+                            {
+                                whereStr = whereStr.Substring(0, whereStr.Length - 2);
+                                string query = string.Format("SELECT * FROM {0} WHERE {1}", tableName, whereStr);
+
+                                cnn.Open();
+                                MethodInfo method = cnn.GetType().GetMethod("ExecuteQueryWithOutRelationship")
+                                .MakeGenericMethod(new Type[] { itemType });
+                                property.SetValue(obj, method.Invoke(cnn, new object[] { query }));
+                                cnn.Close();
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         protected override void MapToOne<T>(SqlServer.MyConnection cnn, System.Data.DataRow dr, T obj)
         {
-            throw new NotImplementedException();
+            var properties = typeof(T).GetProperties();
+
+            foreach (var property in properties)
+            {
+                Type type = property.PropertyType;
+                var attributes = property.GetCustomAttributes(false);
+
+                var arr1 = GetAll(attributes, typeof(OneToOneAttribute));
+                var arr2 = GetAll(attributes, typeof(ManyToOneAttribute));
+
+                var toOneAttributes = new object[arr1.Length + arr2.Length];
+                if (toOneAttributes.Length > 0)
+                {
+                    arr1.CopyTo(toOneAttributes, 0);
+                    arr2.CopyTo(toOneAttributes, arr1.Length);
+                }
+
+                if (toOneAttributes != null && toOneAttributes.Length != 0)
+                {
+                    foreach (var attribute in toOneAttributes)
+                    {
+                        MySqlServerMapper mapper = new MySqlServerMapper();
+                        string tableName = string.Empty;
+                        string whereStr = string.Empty;
+                        string relationshipID = string.Empty;
+
+                        if (attribute.GetType() == typeof(OneToOneAttribute))
+                        {
+                            relationshipID = (attribute as OneToOneAttribute).RelationshipID;
+                            tableName = (attribute as OneToOneAttribute).TableName;
+                        }
+                        else
+                        {
+                            relationshipID = (attribute as ManyToOneAttribute).RelationshipID;
+                            tableName = (attribute as ManyToOneAttribute).TableName;
+                        }
+
+                        MethodInfo getForeignKeyAttributeMethod = mapper.GetType().GetMethod("GetForeignKeys")
+                            .MakeGenericMethod(typeof(T));
+                        List<ForeignKeyAttribute> foreignKeyAttributes = getForeignKeyAttributeMethod.Invoke(mapper, new object[] { relationshipID }) as List<ForeignKeyAttribute>;
+
+                        MethodInfo getColumnAttributeMethod = mapper.GetType().GetMethod("GetColumns")
+                            .MakeGenericMethod(new Type[] { type });
+
+                        List<ColumnAttribute> columnAttributes = getColumnAttributeMethod.Invoke(mapper, null) as List<ColumnAttribute>;
+
+                        if (foreignKeyAttributes != null)
+                        {
+                            foreach (ForeignKeyAttribute foreignKeyAttribute in foreignKeyAttributes)
+                            {
+                                ColumnAttribute column = FindColumn(foreignKeyAttribute.References, columnAttributes);
+                                if (column != null)
+                                {
+                                    string format = "{0} = {1}, ";
+                                    if (column.Type == DataType.NCHAR || column.Type == DataType.NVARCHAR)
+                                        format = "{0} = N'{1}', ";
+                                    else if (column.Type == DataType.CHAR || column.Type == DataType.VARCHAR)
+                                        format = "{0} = '{1}', ";
+
+                                    whereStr += string.Format(format, foreignKeyAttribute.References, dr[foreignKeyAttribute.Name]);
+                                }
+                            }
+                        }
+                        if (!string.IsNullOrEmpty(whereStr))
+                        {
+                            whereStr = whereStr.Substring(0, whereStr.Length - 2);
+                            string query = string.Format("SELECT * FROM {0} WHERE {1}", tableName, whereStr);
+
+                            cnn.Open();
+                            MethodInfo method = cnn.GetType().GetMethod("ExecuteQueryWithOutRelationship")
+                            .MakeGenericMethod(new Type[] { type });
+                            var ienumerable = (IEnumerable)method.Invoke(cnn, new object[] { query });
+                            cnn.Close();
+
+                            MethodInfo method2 = mapper.GetType().GetMethod("GetFirst");
+                            var firstElement = method2.Invoke(mapper, new object[] { ienumerable });
+
+                            property.SetValue(obj, firstElement);
+                        }
+                    }
+                }
+            }
         }
+    }
     }
 }
