@@ -35,21 +35,6 @@ namespace DAM_FW.SqlServer
                 _cnn.Close();
         }
 
-        public override SqlWhere<T> Select<T>()
-        {
-            throw new NotImplementedException();
-        }
-
-        public override int Insert<T>(T obj)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override int Update<T>(T obj)
-        {
-            throw new NotImplementedException();
-        }
-
         public override int Delete<T>(T obj)
         {
             MySqlServerMapper mapper = new MySqlServerMapper();
@@ -57,9 +42,10 @@ namespace DAM_FW.SqlServer
             List<PrimaryKeyAttribute> primaryKeys = mapper.GetPrimaryKeys<T>();
             Dictionary<ColumnAttribute, object> listColumnValues = mapper.GetColumnValues<T>(obj);
 
-            string whereStr = string.Empty;
+            string query = string.Empty;
             foreach (PrimaryKeyAttribute primaryKey in primaryKeys)
             {
+                //tìm cot khóa chính
                 ColumnAttribute column = mapper.FindColumn(primaryKey.Name, listColumnValues);
                 if (column != null)
                 {
@@ -69,19 +55,118 @@ namespace DAM_FW.SqlServer
                     else if (column.Type == DataType.CHAR || column.Type == DataType.VARCHAR)
                         format = "{0} = '{1}', ";
 
-                    whereStr += string.Format(format, primaryKey.Name, listColumnValues[column]);
+                    query += string.Format(format, primaryKey.Name, listColumnValues[column]);
                 }
             }
-            if (!string.IsNullOrEmpty(whereStr))
+            if (!string.IsNullOrEmpty(query))
             {
-                whereStr = whereStr.Substring(0, whereStr.Length - 2);
-                _query = string.Format("DELETE {0} WHERE {1}", tableName, whereStr);
-            } 
+                query = query.Substring(0, query.Length - 2);
+                query = string.Format("DELETE {0} WHERE {1}", tableName, query);
+            }
+            return ExecuteNonQuery(query);
+        }
+        public override int Insert<T>(T obj)
+        {
+            MySqlServerMapper mapper = new MySqlServerMapper();
+
+            string tableName = mapper.GetTableName<T>();
+            List<PrimaryKeyAttribute> primaryKeys = mapper.GetPrimaryKeys<T>();
+            Dictionary<ColumnAttribute, object> listColumnNameValues = mapper.GetColumnValues<T>(obj);
+            string query = string.Empty;
+            if (listColumnNameValues.Count != 0)
+            {
+                string columnStr = string.Empty;
+                string valueStr = string.Empty;
+
+                foreach (ColumnAttribute column in listColumnNameValues.Keys)
+                {
+                    bool isAutoID = false;
+                    foreach (PrimaryKeyAttribute primaryKey in primaryKeys)
+                    {
+                        if (column.Name == primaryKey.Name && primaryKey.AutoID)
+                        {
+                            isAutoID = true;
+                            break;
+                        }
+                    }
+
+                    if (!isAutoID)
+                    {
+                        string format = "{0}, ";
+                        if (column.Type == DataType.NCHAR || column.Type == DataType.NVARCHAR)
+                            format = "N'{0}', ";
+                        else if (column.Type == DataType.CHAR || column.Type == DataType.VARCHAR)
+                            format = "'{0}', ";
+                        columnStr += string.Format("{0}, ", column.Name);
+                        valueStr += string.Format(format, listColumnNameValues[column]);
+                    }
+                }
+                if (!string.IsNullOrEmpty(columnStr) && !string.IsNullOrEmpty(valueStr))
+                {
+                    columnStr = columnStr.Substring(0, columnStr.Length - 2);
+                    valueStr = valueStr.Substring(0, valueStr.Length - 2);
+                    query = string.Format("INSERT INTO {0} ({1}) VALUES ({2})", tableName, columnStr, valueStr);
+                }
+            }
+            return ExecuteNonQuery(query);
         }
 
-        protected int ExecuteNonQuery()
+        public override int Update<T>(T obj)
         {
-            _cmd.CommandText = _query;
+            MySqlServerMapper mapper = new MySqlServerMapper();
+
+            string tableName = mapper.GetTableName<T>();
+            List<PrimaryKeyAttribute> primaryKeys = mapper.GetPrimaryKeys<T>();
+            Dictionary<ColumnAttribute, object> listColumnValues = mapper.GetColumnValues<T>(obj);
+            string query = string.Empty;
+            if (listColumnValues != null && primaryKeys != null)
+            {
+                string setStr = string.Empty;
+
+                foreach (ColumnAttribute column in listColumnValues.Keys)
+                {
+                    string format = "{0} = {1}, ";
+                    if (column.Type == DataType.NCHAR || column.Type == DataType.NVARCHAR)
+                        format = "{0} = N'{1}', ";
+                    else if (column.Type == DataType.CHAR || column.Type == DataType.VARCHAR)
+                        format = "{0} = '{1}', ";
+
+                    setStr += string.Format(format, column.Name, listColumnValues[column]);
+                }
+                if (!string.IsNullOrEmpty(setStr))
+                    setStr = setStr.Substring(0, setStr.Length - 2);
+
+                foreach (PrimaryKeyAttribute primaryKey in primaryKeys)
+                {
+                    ColumnAttribute column = mapper.FindColumn(primaryKey.Name, listColumnValues);
+                    if (column != null)
+                    {
+                        string format = "{0} = {1}, ";
+                        if (column.Type == DataType.NCHAR || column.Type == DataType.NVARCHAR)
+                            format = "{0} = N'{1}', ";
+                        else if (column.Type == DataType.CHAR || column.Type == DataType.VARCHAR)
+                            format = "{0} = '{1}', ";
+
+                        query += string.Format(format, primaryKey.Name, listColumnValues[column]);
+                    }
+                }
+                if (!string.IsNullOrEmpty(query))
+                {
+                    query = query.Substring(0, query.Length - 2);
+                    query = string.Format("UPDATE {0} SET {1} WHERE {2}", tableName, setStr, query);
+                }
+            }
+            return ExecuteNonQuery(query);
+        }
+        public override SqlWhere<T> Select<T>()
+        {
+            throw new NotImplementedException();
+        }
+
+
+        protected int ExecuteNonQuery(string query)
+        {
+            _cmd.CommandText = query;
             return _cmd.ExecuteNonQuery();
         }
         //protected List<T> ExecuteQuery<T>() where T : new()
