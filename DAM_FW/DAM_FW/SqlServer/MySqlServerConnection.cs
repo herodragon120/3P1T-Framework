@@ -169,22 +169,22 @@ namespace DAM_FW.SqlServer
             _cmd.CommandText = query;
             return _cmd.ExecuteNonQuery();
         }
-        //protected List<T> ExecuteQuery<T>() where T : new()
-        //{
-        //    _cmd.CommandText = _query;
+        protected List<T> ExecuteQuery<T>(string query) where T : new()
+        {
+            _cmd.CommandText = query;
 
-        //    DataTable dt = new DataTable();
-        //    SqlDataAdapter adapter = new SqlDataAdapter(_cmd);
-        //    adapter.Fill(dt);
+            DataTable dt = new DataTable();
+            SqlDataAdapter adapter = new SqlDataAdapter(_cmd);
+            adapter.Fill(dt);
 
-        //    List<T> res = new List<T>();
-        //    SCOSqlConnection cnn = new SCOSqlConnection(_connectionString);
-        //    SqlMapper mapper = new SqlMapper();
+            List<T> res = new List<T>();
+            MySqlServerConnection cnn = new MySqlServerConnection(_connectionStr);
+            MySqlServerMapper mapper = new MySqlServerMapper();
 
-        //    foreach (DataRow dr in dt.Rows)
-        //        res.Add(mapper.MapWithRelationship<T>(cnn, dr));
+            foreach (DataRow dr in dt.Rows)
+                res.Add(mapper.MapWithRelationship<T>(cnn, dr));
 
-        //    return res;
-        //}
+            return res;
+        }
     }
 }
