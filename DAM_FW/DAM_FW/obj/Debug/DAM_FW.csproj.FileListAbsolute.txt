@@ -1,1 +1,6 @@
 D:\3P1T-Framework\DAM_FW\DAM_FW\obj\Debug\DAM_FW.csprojResolveAssemblyReference.cache
+E:\DOCS\HK8\Mau Thiet Ke\DoAn\3P1T-Framework2\DAM_FW\DAM_FW\obj\Debug\DAM_FW.csprojResolveAssemblyReference.cache
+E:\DOCS\HK8\Mau Thiet Ke\DoAn\3P1T-Framework2\DAM_FW\DAM_FW\bin\Debug\DAM_FW.dll
+E:\DOCS\HK8\Mau Thiet Ke\DoAn\3P1T-Framework2\DAM_FW\DAM_FW\bin\Debug\DAM_FW.pdb
+E:\DOCS\HK8\Mau Thiet Ke\DoAn\3P1T-Framework2\DAM_FW\DAM_FW\obj\Debug\DAM_FW.dll
+E:\DOCS\HK8\Mau Thiet Ke\DoAn\3P1T-Framework2\DAM_FW\DAM_FW\obj\Debug\DAM_FW.pdb

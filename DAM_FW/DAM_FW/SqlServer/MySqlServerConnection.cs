@@ -13,7 +13,6 @@ namespace DAM_FW.SqlServer
     {
         private SqlConnection _cnn;
         private SqlCommand _cmd;
-        private string _query;
         private MySqlServerConnection(string connectionStr)
         {
             this._connectionStr = connectionStr;
@@ -22,6 +21,10 @@ namespace DAM_FW.SqlServer
             _cmd = new SqlCommand();
             _cmd.Connection = _cnn;
             _cmd.CommandType = CommandType.Text;
+        }
+        public MySqlServerConnection Create(string connectionStr)
+        {
+            return new MySqlServerConnection(connectionStr);
         }
         public override void Open()
         {
@@ -158,9 +161,26 @@ namespace DAM_FW.SqlServer
             }
             return ExecuteNonQuery(query);
         }
-        public override SqlWhere<T> Select<T>()
+        public override List<T> Select<T>(string where,string having,string groupby)
         {
-            throw new NotImplementedException();
+            string query = string.Empty;
+            MySqlServerMapper mapper = new MySqlServerMapper();
+            query += "SELECT";
+            foreach (ColumnAttribute column in mapper.GetColumns<T>())
+                query = string.Format("{0} {1},", query, column.Name);
+
+            query = query.Substring(0, query.Length - 1);
+
+            query = string.Format("{0} FROM {1}", query, mapper.GetTableName<T>());
+
+            if(!string.IsNullOrEmpty(where))
+                query = string.Format("{0} WHERE {1}", query, where);
+            if (!string.IsNullOrEmpty(having))
+                query = string.Format("{0} HAVING {1}", query, having);
+            if (!string.IsNullOrEmpty(groupby))
+                query = string.Format("{0} GROUP BY {1}", query, groupby);
+
+            return ExecuteQuery<T>(query);
         }
 
 

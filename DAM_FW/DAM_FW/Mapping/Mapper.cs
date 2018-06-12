@@ -103,7 +103,7 @@ namespace DAM_FW.Mapping
             else
                 return null;
         }
-        public Dictionary<ColumnAttribute, object> GetColumnValues<T>(T obj)
+        public Dictionary<ColumnAttribute, object> GetColumnValues<T>(T obj) where T : new()
         {
             Dictionary<ColumnAttribute, object> listColumnValues = new Dictionary<ColumnAttribute, object>();
             var properties = typeof(T).GetProperties();
